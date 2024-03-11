@@ -12,12 +12,11 @@ class RRT_STAR(object):
         self.bb = bb
 
     
-    def find_path(self, start_conf, goal_conf, filename):
+    def find_path(self, start_conf, goal_conf, filename, return_cost=False):
         """Implement RRT-STAR - Return a path as numpy array"""
         self.tree = RRTree(start_conf, self.bb)
         
         i = 1
-        time_start = time.perf_counter()
 
         while i < self.max_itr:
             rand_state = self.bb.sample(goal_conf)
@@ -39,15 +38,16 @@ class RRT_STAR(object):
                 if np.array_equal(new_state, goal_conf):
                     print("found goal state!")
                     break
-                print(i)
             i += 1
         
         end_time = time.perf_counter()
-        print(f"algorithm finished in {end_time - time_start} seconds")
-        print(f"added {len(self.tree.vertices.keys())} configurations to tree")
+        # print(f"algorithm finished in {end_time - time_start} seconds")
+        # print(f"added {len(self.tree.vertices.keys())} configurations to tree")
         path, cost = self.tree.path_to_state(goal_conf)
-        print(f"found path with cost {cost}:")
-        pprint(path)
+        # print(f"found path with cost {cost}:")
+        # pprint(path)
+        if return_cost:
+            return path, cost
         return path
 
 
@@ -76,7 +76,7 @@ class RRT_STAR(object):
         # if self.bb.ed(potential_parent, child):
         cost = self.bb.edge_cost(x_potential_parent, x_child)
         if self.tree.cost_to_state(x_potential_parent) + cost < self.tree.cost_to_state(x_child):
-            self.tree.set_parent_for_state(x_child, x_potential_parent)
+            self.tree.set_parent_for_state(state=x_child, new_parent=x_potential_parent)
 
 
     def get_shortest_path(self, dest):
