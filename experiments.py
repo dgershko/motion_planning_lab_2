@@ -12,6 +12,7 @@ import pandas as pd
 import os
 import seaborn as sns
 import matplotlib.pyplot as plt
+from scipy.stats import norm
 
 def init():
     ur_params = UR5e_PARAMS(inflation_factor=1)
@@ -70,9 +71,10 @@ def compute_matrix_results(filename='results.csv'):
 
     # df = df.groupby(["p_bias", "max_step_size"]).agg({"time": ["mean", "std"], "success": "mean", "cost": "mean"})
     print(df_grouped)
-    plot_results(df_grouped)
+    plot_results(df_grouped, df)
 
-def plot_results(df_grouped):
+def plot_results(df_grouped: pd.DataFrame, df: pd.DataFrame):
+    confidence = 0.95
     # Pivot the DataFrame to create a matrix for each variable
     time_matrix = df_grouped[('time', 'mean')].unstack()
     success_matrix = df_grouped[('success', 'mean')].unstack()
@@ -80,7 +82,7 @@ def plot_results(df_grouped):
 
     # Create a heatmap for the mean time
     plt.figure(figsize=(8, 6))
-    sns.heatmap(time_matrix, annot=True, fmt=".2f", cmap='viridis_r')
+    sns.heatmap(time_matrix, annot=True, fmt=".2f", cmap='RdYlBu_r')
     plt.title("Mean Time for Each Parameter Combination")
     plt.xlabel("Max Step Size")
     plt.ylabel("P Bias")
@@ -89,7 +91,7 @@ def plot_results(df_grouped):
 
     # Create a heatmap for the success rate
     plt.figure(figsize=(8, 6))
-    sns.heatmap(success_matrix, annot=True, fmt=".2f", cmap='viridis')
+    sns.heatmap(success_matrix, annot=True, fmt=".2f", cmap='RdYlBu')
     plt.title("Success Rate for Each Parameter Combination")
     plt.xlabel("Max Step Size")
     plt.ylabel("P Bias")
@@ -98,41 +100,45 @@ def plot_results(df_grouped):
 
     # Create a heatmap for the mean cost
     plt.figure(figsize=(8, 6))
-    sns.heatmap(cost_matrix, annot=True, fmt=".2f", cmap='viridis_r')
+    sns.heatmap(cost_matrix, annot=True, fmt=".2f", cmap='RdYlBu_r')
     plt.title("Mean Cost for Each Parameter Combination")
     plt.xlabel("Max Step Size")
     plt.ylabel("P Bias")
     plt.savefig('imgs/cost_heatmap.png')
     plt.close()
 
+    create_errorbar_graph(df, 0.2)
+    create_errorbar_graph(df, 0.05)
+
+def create_errorbar_graph(df: pd.DataFrame, p_bias: float):
+    # plot line graph for avg cost, with 95% confidence interval, for chosen p_bias
+    fig, ax1 = plt.subplots(figsize=(8, 6))
+    cost_df = df[df['cost'].apply(np.isfinite)]
+    data = cost_df[cost_df['p_bias'] == p_bias]
+    sns.lineplot(x='max_step_size', y='cost', data=data, errorbar=('ci', 95), ax=ax1, label='Cost')
+
+    ax2 = ax1.twinx()
+    data = df[df['p_bias'] == p_bias]
+    sns.lineplot(x='max_step_size', y='time', data=data, errorbar=('ci', 95), ax=ax2, linestyle=':', color='orange', label='Time')
+    ax1.set_title(f"Mean Cost and Time for Max Step Size, 95% confidence interval\np_bias={p_bias}")
+    ax1.set_xlabel("Max Step Size")
+    ax1.set_ylabel("Mean Cost")
+    ax1.set_ylim(0, 10)
+    ax2.set_ylabel("Mean Time")
+    ax2.set_ylim(0, 10)
+    lines, labels = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax2.legend(lines + lines2, labels + labels2, loc='upper right')
+    plt.savefig(f'imgs/cost_time_line_p_bias_{p_bias}.png')
+    plt.close(fig)
+    
+
 
 if __name__ == "__main__":
     compute_matrix_results()
-
     try:
         while True:
-            compute_parameter_matrix([0.25, 0.3], [0.5, 0,8, 1, 1.2, 2.0], 5)
-            compute_parameter_matrix([0.1], [0.5, 2.0], 5)
-            compute_parameter_matrix([0.05], [0.8, 1.2], 5)
+            compute_parameter_matrix([0.05, 0.1, 0.2, 0.25, 0.3], [0.1, 0.3, 1.7, 2.5], 5)
+            compute_parameter_matrix([0.05, 0.1, 0.2, 0.25, 0.3], [0.1, 0.3, 0.5, 0.8, 1.0, 1.2, 1.7, 2.0, 2.5], 5)
     except KeyboardInterrupt:
         compute_matrix_results()
-    # bb, vis = init()
-    # env2_start = np.deg2rad([110, -70, 90, -90, -90, 0 ])
-    # env2_goal = np.deg2rad([50, -80, 90, -90, -90, 0 ])
-    # planner = RRT_STAR(0.5, 2000, bb)
-    # profiler = cProfile.Profile()
-    # start = perf_counter()
-    # profiler.enable()
-    # planner.find_path(env2_start, env2_goal, "")
-    # profiler.disable()
-    # print(f"time taken: {perf_counter() - start}")
-    # profiler.dump_stats('output.pstats')
-    # print("hits:", bb.cache_hits)
-    # print("misses: ", bb.cache_misses)
-    # explored_configs = [np.array(vertex) for vertex in planner.tree.vertices.keys()]
-    # explored_points = [bb.transform.conf2sphere_coords(conf)["wrist_3_link"][-1][:-1] for conf in explored_configs]
-    # # explored spheres is explored points with a chosen radius as the 4th coord
-    # explored_spheres = np.array([np.concatenate([point, [0.05]]) for point in explored_points])
-    # pprint(explored_spheres)
-    # vis.draw_manual_spheres(explored_spheres)
-    # vis.show_conf(env2_goal)
